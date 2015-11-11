@@ -8,6 +8,7 @@ use Data::Dumper;
 use PVE::Tools;
 use PVE::HA::Tools ':exit_codes';
 use PVE::HA::NodeStatus;
+use PVE::HA::Fence;
 
 sub new {
     my ($this, $haenv) = @_;
@@ -36,7 +37,8 @@ sub new {
 sub cleanup {
     my ($self) = @_;
 
-    # todo: ?
+    # reset pending fence jobs and node states
+    $self->{ns}->cleanup();
 }
 
 sub flush_master_status {
