@@ -2,6 +2,7 @@ package PVE::HA::NodeStatus;
 
 use strict;
 use warnings;
+use PVE::HA::Fence;
 
 use Data::Dumper;
 
@@ -181,11 +182,47 @@ sub fence_node {
 	&$set_node_state($self, $node, 'fence');
     }
 
-    my $success = $haenv->get_ha_agent_lock($node);
+    my ($success, $hw_fence_success) = (0, 0);
+
+    my $fencing_mode = $haenv->fencing_mode();
+
+    if ($fencing_mode eq 'hardware' || $fencing_mode eq 'both') {
+
+	$hw_fence_success = PVE::HA::Fence::is_node_fenced($node);
+
+	# bad fence.cfg or no devices and only hardware fencing configured
+	if ($hw_fence_success < 0 && $fencing_mode eq 'hardware') {
+	    $haenv->log('err', "Fencing of node '$node' failed and needs " .
+			"manual intervention!");
+	    return 0;
+	}
+
+	if ($hw_fence_success > 0) {
+	    # we fenced the node, now we're allowed to "steal" its lock
+	    $haenv->log('notice', "fencing of node '$node' succeeded, " .
+			"trying to get its agent lock");
+	    $haenv->release_ha_agent_lock($node);
+
+	} else {
+
+	    # start and process fencing
+	    if (PVE::HA::Fence::run_fence_jobs($haenv, $node)) {
+		$haenv->log('notice', "Started fencing off node '$node'");
+	    }
+
+	}
+    }
+
+    # we *always* need the failed nodes lock, it secures that we are allowed to
+    # recover its services and prevents races, e.g. if it's restarting.
+    if ($hw_fence_success || $fencing_mode ne 'hardware' ) {
+	$success = $haenv->get_ha_agent_lock($node);
+    }
 
     if ($success) {
 	$haenv->log("info", "fencing: acknowleged - got agent lock for node '$node'");
 	&$set_node_state($self, $node, 'unknown');
+	PVE::HA::Fence::kill_and_cleanup_jobs($node) if ($fencing_mode ne 'watchdog');
     }
 
     return $success;
