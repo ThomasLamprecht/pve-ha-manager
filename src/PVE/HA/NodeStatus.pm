@@ -2,6 +2,7 @@ package PVE::HA::NodeStatus;
 
 use strict;
 use warnings;
+use PVE::HA::Fence;
 
 use JSON;
 use Data::Dumper;
@@ -13,8 +14,11 @@ sub new {
 
     my $class = ref($this) || $this;
 
+    my $fencer = PVE::HA::Fence->new($haenv);
+
     my $self = bless {
 	haenv => $haenv,
+	fencer => $fencer,
 	status => $status,
 	last_online => {},
     }, $class;
@@ -207,6 +211,7 @@ sub fence_node {
     my ($self, $node) = @_;
 
     my $haenv = $self->{haenv};
+    my $fencer = $self->{fencer};
 
     my $state = $self->get_node_state($node);
 
@@ -216,16 +221,63 @@ sub fence_node {
 	&$send_fence_state_email($self, 'FENCE', $msg, $node);
     }
 
-    my $success = $haenv->get_ha_agent_lock($node);
+    my ($success, $hw_fence_success) = (0, 0);
+
+    my $fencing_mode = $haenv->fencing_mode();
+
+    if ($fencing_mode eq 'hardware' || $fencing_mode eq 'both') {
+
+	$hw_fence_success = $fencer->is_node_fenced($node);
+
+	# bad fence.cfg or no devices and only hardware fencing configured
+	if ($hw_fence_success < 0 && $fencing_mode eq 'hardware') {
+	    $haenv->log('err', "Fencing of node '$node' failed and needs " .
+			"manual intervention!");
+	    return 0;
+	}
+
+	if ($hw_fence_success > 0) {
+	    # we fenced the node, now we're allowed to "steal" its lock
+	    $haenv->log('notice', "fencing of node '$node' succeeded, " .
+			"trying to get its agent lock");
+	    # This may only be done after successfully fencing node!
+	    $haenv->release_ha_agent_lock($node);
+
+	} else {
+
+	# start and process fencing
+	$fencer->run_fence_jobs($node);
+
+	}
+    }
+
+    # we *always* need the failed nodes lock, it secures that we are allowed to
+    # recover its services and prevents races, e.g. if it's restarting.
+    if ($hw_fence_success || $fencing_mode ne 'hardware' ) {
+	$success = $haenv->get_ha_agent_lock($node);
+    }
 
     if ($success) {
 	my $msg = "fencing: acknowledged - got agent lock for node '$node'";
 	$haenv->log("info", $msg);
 	&$set_node_state($self, $node, 'unknown');
 	&$send_fence_state_email($self, 'SUCCEED', $msg, $node);
+	$fencer->kill_and_cleanup_jobs($node) if ($fencing_mode ne 'watchdog');
     }
 
     return $success;
+}
+
+sub cleanup {
+    my ($self) = @_;
+
+    my $haenv = $self->{haenv};
+    my $fencer = $self->{fencer};
+
+    if ($fencer->has_fencing_job($haenv->nodename())) {
+	$haenv->log('notice', "bailing out from running fence jobs");
+	$fencer->kill_and_cleanup_jobs();
+    }
 }
 
 1;
