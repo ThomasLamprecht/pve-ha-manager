@@ -72,6 +72,117 @@ works using reliable HW fence devices.
 
 Above 'self fencing' algorithm does not work if you use this option!
 
+== Hardware Fencing ==
+
+This is for the users who want to use external fence devices.
+
+While they may have some advantages like:
+
+- possible faster recovery as its normally faster than the lock timeout
+
+- soft watchdog can (!) be less reliable
+
+- maybe someone does not want to reset but rather cut the machine off for
+  investigation
+
+But also can introduce some disadvantages, like:
+
+- added complexity
+
+- depends on external device (which can also fail)
+
+=== Fence Agents Supported ===
+
+We package the fence-agents collection from ClusterLabs:
+https://github.com/ClusterLabs/fence-agents
+apt-get install fence-agents-pve
+
+This has a wide variety of supported fence agents and should cover all needs.
+
+If you must use special hardware you can write your own agent, simply follow
+the specs from the ClusterLabs agent so that your and their agents are interface
+compatible.
+
+At least they have to support the following parameters:
+- node
+- plug
+- action
+
+
+=== Fence Device Configuration ===
+
+We use the configuration schema from dlm.conf (see man dlm.conf),
+this allows us to use a quite easily and simple configuration schema
+while not restricting an user, as complex setups are still possible.
+
+The basic format looks like:
+
+  device  dev_name agent [args]
+  connect dev_name node=nodeid [args]
+  connect dev_name node=nodeid [args]
+  connect dev_name node=nodeid [args]
+
+Example:
+
+  # simple devices
+  device first_dev fence_pve ip="192.168.XX.XX" password="12345" action=off
+  connect first_dev node=node1 plug=100
+  connect first_dev node=node2 plug=101
+  connect first_dev node=node3 plug=102
+
+But the schema is able to do more, e.g. parallel devices.
+
+Multiple devices can be configured per node, the will be executed from top
+to bottom until a fence devices succeeds.
+
+NOTE: use the longopts where possible, e.g.: use username=foo instead of l=foo
+      if a option has only a short option and its boolean then you may use it.
+
+=== Internal Configuration Representation ===
+
+We use an hash with a scructure like this:
+
+#my $test_fence_device = {
+#    foo_apc => { # <-- device name
+#	priority => 0,
+#	sub_devs => {
+#	    1 => { # two parallel devices
+#		agent => "fence_apc",
+#		args => ['ip=192.168.1.50', 'username=fencing', 'password=12345', 'x', 'o=off'],
+#		node_args => {
+#		    uno => [n=1', 's=1'],
+#		    due => [n=2', 's=2'],
+#		    tre => [n=3', 's=1'],
+#		},
+#	    },
+#	    2 => {
+#		agent => "fence_apc",
+#		args => ['ip=192.168.1.51', 'username=fencing', 'password="12345 asd"', 'x', 'o=off'],
+#		node_args => {
+#		    uno => [n=1', 's=1'],
+#		    due => [n=2', 's=2'],
+#		    tre => [n=3', 's=1'],
+#		},
+#	    },
+#	}
+#    },
+#    bar_device => { # second fence device
+#	priority => 1,
+#	sub_devs => {
+#	    1 => {
+#		agent => "fence_pve",
+#		args => ['ip=192.168.1.18', 'password="12345 asd"', 'o=off'],
+#		node_args => {
+#		    uno => [n=100', 's=1'],
+#		    due => [n=101', 's=1'],
+#		    tre => [n=102', 's=1'],
+#		},
+#	    },
+#	}
+#    },
+#};
+
+
 == Testing requirements ==
 
 We want to be able to simulate HA cluster, using a GUI. This makes it easier
