@@ -318,9 +318,9 @@ sub get_ha_agent_lock {
 # this should only get called if the nodes LRM gracefully shuts down with
 # all services already cleanly stopped!
 sub release_ha_agent_lock {
-    my ($self) = @_;
+    my ($self, $node) = @_;
 
-    my $node = $self->nodename();
+    $node = $node || $self->nodename();
 
     return rmdir("$lockdir/ha_agent_${node}_lock");
 }

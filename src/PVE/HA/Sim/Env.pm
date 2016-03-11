@@ -75,13 +75,17 @@ sub sim_get_lock {
 	    if (my $d = $data->{$lock_name}) {
 		my $tdiff = $ctime - $d->{time};
 
+		my $manager_node = $data->{'ha_manager_lock'}->{node} || '';
+
+		$res = 0;
 		if ($tdiff > $self->{lock_timeout}) {
 		    $res = 1;
-		} elsif (($tdiff <= $self->{lock_timeout}) && ($d->{node} eq $nodename)) {
-		    delete $data->{$lock_name};
-		    $res = 1;
 		} else {
-		    $res = 0;
+		    # if we aren't manager we may unlock only *our* lock
+		    if ($d->{node} eq $nodename || $manager_node eq $nodename) {
+			delete $data->{$lock_name};
+			$res = 1;
+		    }
 		}
 	    }
 
@@ -277,9 +281,9 @@ sub get_ha_agent_lock {
 # this should only get called if the nodes LRM gracefully shuts down with
 # all services already cleanly stopped!
 sub release_ha_agent_lock {
-    my ($self) = @_;
+    my ($self, $node) = @_;
 
-    my $node = $self->nodename();
+    $node = $node || $self->nodename();
 
     my $lock = $self->get_ha_agent_lock_name($node);
     return $self->sim_get_lock($lock, 1);
