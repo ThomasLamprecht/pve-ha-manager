@@ -2,6 +2,9 @@ package PVE::HA::NodeStatus;
 
 use strict;
 use warnings;
+
+use JSON;
+
 use PVE::HA::Fence;
 
 use Data::Dumper;
@@ -170,6 +173,37 @@ sub update {
    }
 }
 
+# assembles a commont text for fence emails
+my $send_fence_state_email = sub {
+    my ($self, $subject_prefix, $subject, $node) = @_;
+
+    my $haenv = $self->{haenv};
+
+    my $mail_text = <<EOF
+The node '$node' failed and needs manual intervention.
+
+The PVE HA manager tries  to fence it and recover the
+configured HA resources to a healthy node if possible.
+
+Current fence status:  $subject_prefix
+$subject
+
+
+Overall Cluster status:
+-----------------------
+
+EOF
+;
+    my $mail_subject = $subject_prefix . ': ' . $subject;
+
+    my $status = $haenv->read_manager_status();
+    my $data = { manager_status => $status, node_status => $self->{status} };
+
+    $mail_text .= to_json($data, { pretty => 1, canonical => 1});
+
+    $haenv->sendmail($mail_subject, $mail_text);
+};
+
 # start fencing
 sub fence_node {
     my ($self, $node) = @_;
@@ -180,6 +214,8 @@ sub fence_node {
 
     if ($state ne 'fence') {
 	&$set_node_state($self, $node, 'fence');
+	my $msg = "Try to fence node '$node'";
+	&$send_fence_state_email($self, 'FENCE', $msg, $node);
     }
 
     my ($success, $hw_fence_success) = (0, 0);
@@ -192,8 +228,9 @@ sub fence_node {
 
 	# bad fence.cfg or no devices and only hardware fencing configured
 	if ($hw_fence_success < 0 && $fencing_mode eq 'hardware') {
-	    $haenv->log('err', "Fencing of node '$node' failed and needs " .
-			"manual intervention!");
+	    my $msg = "Fencing of node '$node' failed and needs manual intervention!";
+	    $haenv->log('err', $msg);
+	    &$send_fence_state_email($self, 'FAILED', $msg, $node);
 	    return 0;
 	}
 
@@ -220,8 +257,10 @@ sub fence_node {
     }
 
     if ($success) {
-	$haenv->log("info", "fencing: acknowleged - got agent lock for node '$node'");
+	my $msg = "fencing: acknowleged - got agent lock for node '$node'";
+	$haenv->log("info", $msg);
 	&$set_node_state($self, $node, 'unknown');
+	&$send_fence_state_email($self, 'SUCEED', $msg, $node);
 	PVE::HA::Fence::kill_and_cleanup_jobs($node) if ($fencing_mode ne 'watchdog');
     }
 
