@@ -224,6 +224,13 @@ sub log {
     printf("%-5s %5d %12s: $msg\n", $level, $time, "$self->{nodename}/$self->{log_id}");
 }
 
+sub sendmail {
+    my ($self, $subject, $text) = @_;
+
+    # only log subject, not spam the regression logs
+    $self->log('email', $subject);
+}
+
 sub get_time {
     my ($self) = @_;
 
