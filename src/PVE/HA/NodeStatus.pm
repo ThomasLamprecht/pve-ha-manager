@@ -2,6 +2,7 @@ package PVE::HA::NodeStatus;
 
 use strict;
 use warnings;
+
 use PVE::HA::Fence;
 
 use JSON;
@@ -205,7 +206,6 @@ EOF
     $haenv->sendmail($mail_subject, $mail_text);
 };
 
-
 # start fencing
 sub fence_node {
     my ($self, $node) = @_;
@@ -231,8 +231,9 @@ sub fence_node {
 
 	# bad fence.cfg or no devices and only hardware fencing configured
 	if ($hw_fence_success < 0 && $fencing_mode eq 'hardware') {
-	    $haenv->log('err', "Fencing of node '$node' failed and needs " .
-			"manual intervention!");
+	    my $msg = "Fencing of node '$node' failed and needs manual intervention!";
+	    $haenv->log('err', $msg);
+	    &$send_fence_state_email($self, 'FAILED', $msg, $node);
 	    return 0;
 	}
 
