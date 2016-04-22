@@ -23,11 +23,14 @@ sub new {
     # fixme: use separate class  PVE::HA::ServiceStatus
     my $ss = $ms->{service_status} || {};
 
+    my $monitors = $ms->{monitors} || {};
+
     my $self = bless {
 	haenv => $haenv,
 	ms => $ms, # master status
 	ns => $ns, # PVE::HA::NodeStatus
 	ss => $ss, # service status
+	monitors => $monitors, # resource monitors
     }, $class;
 
     return $self;
@@ -44,12 +47,15 @@ sub flush_master_status {
 
     my ($haenv, $ms, $ns, $ss) = ($self->{haenv}, $self->{ms}, $self->{ns}, $self->{ss});
 
+    my $monitors = $self->{monitors};
+
     $ms->{node_status} = $ns->{status};
     $ms->{service_status} = $ss;
+    $ms->{monitors} = $monitors;
     $ms->{timestamp} = $haenv->get_time();
-    
+
     $haenv->write_manager_status($ms);
-} 
+}
 
 sub select_service_node {
     my ($groups, $online_node_usage, $service_conf, $current_node, $try_next) = @_;
@@ -319,6 +325,8 @@ sub manage {
 
     my ($haenv, $ms, $ns, $ss) = ($self->{haenv}, $self->{ms}, $self->{ns}, $self->{ss});
 
+    my $monitors = $self->{monitors};
+
     my ($lrm_results, $lrm_modes, $timestamps) = $self->read_lrm_status();
 
     my ($node_info, $quorate) = $haenv->get_node_info();
@@ -338,11 +346,19 @@ sub manage {
 
     # add new service
     foreach my $sid (sort keys %$sc) {
-	next if $ss->{$sid}; # already there
-	$haenv->log('info', "adding new service '$sid' on node '$sc->{$sid}->{node}'");
-	# assume we are running to avoid relocate running service at add
-	$ss->{$sid} = { state => 'started', node => $sc->{$sid}->{node},
-			uid => compute_new_uuid('started') };
+	next if $ss->{$sid} || $monitors->{$sid}; # already there
+
+	if ($sc->{$sid}->{monitor}) {
+	    # monitors are special resources which the CRM does not touch
+	    # they are controlled entirely by the LRM
+	    $monitors->{$sid} = {state => $sc->{$sid}->{state}, node => $sc->{$sid}->{node}};
+	    $haenv->log('info', "adding new monitor '$sid' on node '$sc->{$sid}->{node}'");
+	} else {
+	    $haenv->log('info', "adding new service '$sid' on node '$sc->{$sid}->{node}'");
+	    # assume we are running to avoid relocate running service at add
+	    $ss->{$sid} = { state => 'started', node => $sc->{$sid}->{node},
+			    uid => compute_new_uuid('started') };
+	}
     }
 
     # remove stale service from manager state
@@ -355,6 +371,13 @@ sub manage {
     # remove stale relocation try entries
     foreach my $sid (keys %{$ms->{relocate_trial}}) {
 	delete $ms->{relocate_trial}->{$sid} if !$ss->{$sid};
+    }
+
+    # remove stale monitors
+    foreach my $sid (keys %$monitors) {
+	next if $sc->{$sid};
+	$haenv->log('info', "removing stale monitors '$sid' (no config)");
+	delete $monitors->{$sid};
     }
 
     $self->update_crm_commands();

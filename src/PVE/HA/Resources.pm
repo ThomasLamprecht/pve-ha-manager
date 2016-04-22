@@ -41,6 +41,14 @@ my $defaultData = {
 	    default => 1,
 	    minimum => 0,
 	},
+	node => get_standard_option('pve-node', { optional => 1 }),
+	monitor => {
+	    description => "If true the resource acts as monitor and if it's" .
+		" not running/up for longer than a minute the node will be fenced.",
+	    type => 'boolean',
+	    optional => 1,
+	    default => 0,
+	},
 	comment => {
 	    description => "Description.",
 	    type => 'string',

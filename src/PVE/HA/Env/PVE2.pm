@@ -19,9 +19,11 @@ use PVE::HA::FenceConfig;
 use PVE::HA::Resources;
 use PVE::HA::Resources::PVEVM;
 use PVE::HA::Resources::PVECT;
+use PVE::HA::Resources::PingMonitor;
 
 PVE::HA::Resources::PVEVM->register();
 PVE::HA::Resources::PVECT->register();
+PVE::HA::Resources::PingMonitor->register();
 
 PVE::HA::Resources->init();
 
@@ -124,6 +126,7 @@ sub read_service_config {
 	$d->{state} = 'enabled' if !defined($d->{state});
 	$d->{max_restart} = 1 if !defined($d->{max_restart});
 	$d->{max_relocate} = 1 if !defined($d->{max_relocate});
+	$d->{monitor} = 0 if !defined($d->{monitor});
 	if (PVE::HA::Resources->lookup($d->{type})) {
 	    if (my $vmd = $vmlist->{ids}->{$name}) {
 		if (!$vmd) {

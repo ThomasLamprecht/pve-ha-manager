@@ -88,7 +88,7 @@ sub parse_sid {
 
     my ($type, $name);
 
-    if ($sid =~ m/^(\d+)$/) {
+    if (defined($sid) && $sid =~ m/^(\d+)$/) {
 	$name = $1;
 	my $vmlist = PVE::Cluster::get_vmlist();
 	if (defined($vmlist->{ids}->{$name})) {

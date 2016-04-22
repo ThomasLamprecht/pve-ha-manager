@@ -107,13 +107,49 @@ sub set_local_status {
     $self->{status} = $new;
 }
 
+sub check_monitors {
+    my ($self) = @_;
+
+    my $monitors = $self->{monitors};
+    return 1 if !(defined($monitors) && keys %$monitors);
+
+    my $haenv = $self->{haenv};
+    my $nodename = $haenv->nodename();
+
+    # TODO async!!
+    foreach my $mon_id (keys %$monitors) {
+	next if $monitors->{$mon_id}->{state} ne 'enabled';
+	next if $nodename ne $monitors->{$mon_id}->{node};
+
+	my (undef, $service_type, $service_name) = PVE::HA::Tools::parse_sid($mon_id);
+
+	my $plugin = PVE::HA::Resources->lookup($service_type);
+	if (!$plugin) {
+	    $haenv->log('err', "service type '$service_type' not implemented");
+	    return EUNKNOWN_SERVICE_TYPE;
+	}
+
+	my $id = $service_name;
+
+	if (!$plugin->check_running($haenv, $id)) {
+	    $haenv->log('warning', "Disable LRM updates, monitor '$id' unhealthy!");
+	    return 0;
+	}
+    }
+
+    return 1;
+}
+
 sub update_lrm_status {
     my ($self) = @_;
 
     my $haenv = $self->{haenv};
 
     return 0 if !$haenv->quorate();
-    
+
+    # need better wy to tell master that we're gone, FIXME
+    return 0 if !$self->check_monitors();
+
     my $lrm_status = {	
 	state => $self->{status}->{state},
 	mode => $self->{mode},
@@ -211,6 +247,8 @@ sub do_one_iteration {
 
     my $ms = $haenv->read_manager_status();
     $self->{service_status} =  $ms->{service_status} || {};
+
+    $self->{monitors} =  $ms->{monitors} || {};
 
     my $fence_request = PVE::HA::Tools::count_fenced_services($self->{service_status}, $haenv->nodename());
     

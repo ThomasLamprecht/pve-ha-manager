@@ -1,4 +1,4 @@
-SOURCES=PVEVM.pm PVECT.pm
+SOURCES=PVEVM.pm PVECT.pm PingMonitor.pm
 
 .PHONY: install
 install:
