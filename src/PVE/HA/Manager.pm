@@ -264,9 +264,11 @@ sub read_lrm_status {
 
     my $results = {};
     my $modes = {};
+    my $timestamps = {};
     foreach my $node (@$nodes) {
 	my $lrm_status = $haenv->read_lrm_status($node);
 	$modes->{$node} = $lrm_status->{mode} || 'active';
+	$timestamps->{$node} = $lrm_status->{timestamp} || $haenv->get_time();
 	foreach my $uid (keys %{$lrm_status->{results}}) {
 	    next if $results->{$uid}; # should not happen
 	    $results->{$uid} = $lrm_status->{results}->{$uid};
@@ -274,7 +276,7 @@ sub read_lrm_status {
     }
 
     
-    return ($results, $modes);
+    return ($results, $modes, $timestamps);
 }
 
 # read new crm commands and save them into crm master status
@@ -317,14 +319,16 @@ sub manage {
 
     my ($haenv, $ms, $ns, $ss) = ($self->{haenv}, $self->{ms}, $self->{ns}, $self->{ss});
 
-    $ns->update($haenv->get_node_info());
+    my ($lrm_results, $lrm_modes, $timestamps) = $self->read_lrm_status();
 
-    if (!$ns->node_is_online($haenv->nodename())) {
+    my ($node_info, $quorate) = $haenv->get_node_info();
+
+    $ns->update($node_info, $timestamps);
+
+    if (!($ns->node_is_online($haenv->nodename()) || $quorate)) {
 	$haenv->log('info', "master seems offline");
 	return;
     }
-
-    my ($lrm_results, $lrm_modes) = $self->read_lrm_status();
 
     my $sc = $haenv->read_service_config();
 

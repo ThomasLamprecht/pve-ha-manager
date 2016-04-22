@@ -118,7 +118,7 @@ my $set_node_state = sub {
 };
 
 sub update {
-    my ($self, $node_info) = @_;
+    my ($self, $node_info, $timestamps) = @_;
 
     my $haenv = $self->{haenv};
 
@@ -126,20 +126,32 @@ sub update {
 	my $d = $node_info->{$node};
 	next if !$d->{online};
 
-	# record last time the node was online (required to implement fence delay)
-	$self->{last_online}->{$node} = $haenv->get_time();
-
 	my $state = $self->get_node_state($node);
 
+	my $ctime = $haenv->get_time();
+
 	if ($state eq 'online') {
-	    # &$set_node_state($self, $node, 'online');
+	    # if a node is quorate but its LRM is dead mark it as 'unknown'
+	    # to allow a possible needed service recovery
+	    if (defined($timestamps->{$node}) && ($ctime - $timestamps->{$node}) >= $fence_delay) {
+		&$set_node_state($self, $node, 'unknown');
+		next;
+	    }
 	} elsif ($state eq 'unknown' || $state eq 'gone') {
-	    &$set_node_state($self, $node, 'online');
+	    # mark new nodes or quorate with active LRM nodes as online
+	    if (!defined($timestamps->{$node}) || ($ctime - $timestamps->{$node}) < $fence_delay) {
+		&$set_node_state($self, $node, 'online');
+	    } else {
+		next;
+	    }
 	} elsif ($state eq 'fence') {
 	    # do nothing, wait until fenced
 	} else {
 	    die "detected unknown node state '$state";
 	}
+
+	# record last time the node was online (required to implement fence delay)
+	$self->{last_online}->{$node} = $ctime;
     }
 
     foreach my $node (sort keys %{$self->{status}}) {
