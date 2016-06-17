@@ -30,6 +30,8 @@ sub new {
 	ss => $ss, # service status
     }, $class;
 
+    $self->cleanup_manager_status();
+
     return $self;
 }
 
@@ -37,6 +39,23 @@ sub cleanup {
     my ($self) = @_;
 
     # todo: ?
+}
+
+sub cleanup_manager_status {
+    my ($self) = @_;
+
+    my $ms = $self->{ms};
+    my $new_state = {};
+
+    # safe only the state part of the manager which cannot be auto generated
+    my @ms_state_key_whitelist = qw(service_status master_node);
+
+    foreach my $k (@ms_state_key_whitelist) {
+	next if !$ms->{$k};
+	$new_state->{$k} = $ms->{$k};
+    }
+
+    $self->{ms} = $new_state;
 }
 
 sub flush_master_status {
