@@ -1,0 +1,5 @@
+Test failover after single node network failure with parallel HW fence devices.
+As the simulated Environment is limited to a single powerplug you will see the
+"killed by poweroff" only once, more important is that the three fence agents
+get executed and that the node is fenced only after all three successfully
+finsihed.

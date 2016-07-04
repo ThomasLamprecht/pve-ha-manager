@@ -1,0 +1,3 @@
+Test HW fencing and failover after the network of two nodes fails.
+This test if the HW fence mechanism can cope with multiple nodes failing
+simultaneously, as long there is still quorum.
