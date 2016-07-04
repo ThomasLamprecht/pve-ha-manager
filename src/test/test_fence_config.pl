@@ -38,6 +38,68 @@ sub get_nodes {
     return ('node1', 'node2', 'node3');
 };
 
+# compares if two data structures are equivalent.
+# the may contain hashes, arrays, scalars. May be nested also, we travel
+# through the structure recursively
+sub deep_cmp {
+    my ($a, $b, $noerr) = @_;
+
+    eval {
+	if (ref($a) ne ref($b)) {
+	    die "variables not the same ref: " . ref($a) ." != " . ref($b) . "\n";
+	}
+
+	if (ref($a) eq 'HASH') {
+	    if (scalar(keys %$a) != scalar(keys %$b)) {
+		die "variables are not of the same length\n";
+	    }
+
+	    my %cmp = map { $_ => 1 } keys %$a;
+	    for my $key (keys %$b) {
+		if (!exists $cmp{$key}) {
+		    die "variables not equal";
+		}
+		if(!deep_cmp($a->{$key}, $b->{$key})) {
+		    die "variables not equal";
+		}
+		delete $cmp{$key};
+	    }
+
+	    die "variables not equal" if %cmp;
+
+	} elsif (ref($a) eq 'ARRAY') {
+	    if (scalar(@$a) != scalar(@$b)) {
+		die "variables are not of the same length\n";
+	    }
+
+	    for (my $i = 0; $i < scalar(@$a); $i++) {
+		if(!deep_cmp(@$a[$i], @$b[$i])) {
+		    die "variables not equal";
+		}
+	    }
+
+	} elsif (ref($a) eq 'SCALAR' || ref($a) eq '') {
+
+	    if(defined $a && defined $b) {
+		return $a eq $b;
+	    } else {
+		return !(defined $a || defined $b);
+	    }
+
+	} else {
+	    die "unimplemented ref type: '" . ref($a) . "'\n";
+	}
+    };
+    if (my $err = $@) {
+	$err = "deep_cmp: $err";
+	die $err if !$noerr;
+	warn $err;
+	return undef;
+    }
+
+	return 1;
+}
+
 sub check_cfg {
     my ($cfg_fn, $outfile) = @_;
 
