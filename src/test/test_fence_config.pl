@@ -144,6 +144,50 @@ sub check_cfg {
     }
 };
 
+sub parser_self_check {
+    my $cfg_fn = shift;
+
+    print "* parser self check: $cfg_fn\n";
+
+    my $outfile = "$cfg_fn.write";
+    my ($config1, $config2, $raw);
+
+    eval {
+	# read first time
+	$raw = PVE::Tools::file_get_contents($cfg_fn);
+	$config1 = PVE::HA::FenceConfig::parse_config($cfg_fn, $raw);
+    };
+    if (my $err = $@) {
+	print "* initial parse failed, skip parser self check\n\n";
+	return;
+    }
+
+    eval {
+	# write config
+	$raw = PVE::HA::FenceConfig::write_config($outfile, $config1);
+	PVE::Tools::file_set_contents($outfile, $raw);
+
+	# reread written config (must be the same as config1)
+	$raw = PVE::Tools::file_get_contents($outfile);
+	$config2 = PVE::HA::FenceConfig::parse_config($outfile, $raw);
+
+    };
+    if (my $err = $@) {
+	die "parser_self_check test error: $err";
+    }
+
+    my $res;
+    eval {
+	$res = deep_cmp($config1, $config2);
+    };
+    if (my $err = $@ || !$res) {
+	die "parser_self_check test failed! Configs not equivalent\n" .
+	     Dumper($config1, $config2) . "\n";
+    }
+
+    print "* end parser_self_check: $cfg_fn (success)\n\n";
+}
+
 sub run_test {
     my $cfg_fn = shift;
 
@@ -179,8 +223,10 @@ sub run_test {
 
 if (my $testcfg = shift) {
     run_test($testcfg);
+    parser_self_check($testcfg);
 } else {
     foreach my $cfg (<fence_cfgs/*.cfg>) {
 	run_test($cfg);
+	parser_self_check($cfg);
     }
 }
