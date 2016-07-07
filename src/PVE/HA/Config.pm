@@ -38,7 +38,16 @@ cfs_register_file($ha_fence_config,
 sub json_reader {
     my ($filename, $data) = @_;
 
-    return defined($data) ? decode_json($data) : {};
+    my $res;
+    eval {
+	$res = decode_json($data)
+    };
+    if (my $err = $@) {
+	warn "Could not decode json: $err\n";
+	$res = {};
+    }
+
+    return $res;
 }
 
 sub json_writer {
