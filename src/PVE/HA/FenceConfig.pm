@@ -117,6 +117,24 @@ sub write_config {
     return $raw;
 }
 
+sub parse_dev_id {
+    my ($dev_id) = @_;
+
+    my ($dev_name, $dev_number);
+
+    if ($dev_id =~ m/^(\w+):(\d+)/) {
+	$dev_name = $1;
+	$dev_number = $2;
+    } elsif ($dev_id =~ m/^(\w+)/) {
+	$dev_name = $1;
+	$dev_number = 1;
+	$dev_id .= ':1';
+    } else {
+	die "unable to parse fence device id '$dev_id'\n";
+    }
+
+    return wantarray ? ($dev_name, $dev_number, $dev_id) : $dev_id;
+}
 
 
 sub gen_arg_str {
