@@ -79,9 +79,44 @@ PVE::JSONSchema::register_standard_option('pve-ha-group-node-list', {
     typetext => '<node>[:<pri>]{,<node>[:<pri>]}*',
 });
 
+PVE::JSONSchema::register_format('pve-ha-fence-agent-arg', \&pve_verify_ha_fence_agent_arg);
+sub pve_verify_ha_fence_agent_arg {
+    my ($arg, $noerr) = @_;
+
+    if ($arg !~ m/^(a-zA-Z)|(([a-zA-Z0-9]([a-zA-Z0-9\-\_]*[a-zA-Z0-9])?)(=(a-zA-Z0-9\-\_\+)+)?)$/) {
+	return undef if $noerr;
+	die "value '$arg' does not look like a valid ha fence agent argument\n";
+    }
+    return $arg;
+}
+
+PVE::JSONSchema::register_standard_option('pve-ha-fence-agent-arg-list', {
+    description => "List of argumantes for fence agent devices.",
+    type => 'string', format => 'pve-ha-fence-agent-arg-list',
+    typetext => '<arg>{,<arg>}*',
+});
+
 PVE::JSONSchema::register_standard_option('pve-ha-group-id', {
     description => "The HA group identifier.",
     type => 'string', format => 'pve-configid',
+});
+
+PVE::JSONSchema::register_format('pve-ha-fence-device-id', \&pve_verify_ha_fence_device_id);
+sub pve_verify_ha_fence_device_id {
+    my ($id, $noerr) = @_;
+
+    if ($id !~ m/^\w+(:\d+)?$/) {
+	return undef if $noerr;
+	die "value '$id' does not look like a valid ha fence device id\n";
+    }
+    return $id;
+}
+
+PVE::JSONSchema::register_standard_option('pve-ha-fence-device-id', {
+    description => "HA fence device id. This consists of a fence device name and an optional " .
+                   "numerical id to mark that its a sub device of a parallel device set. ",
+    typetext => "<devicename>[:<subdevicenum>]",
+    type => 'string', format => 'pve-ha-fence-device-id',
 });
 
 sub parse_sid {
