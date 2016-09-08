@@ -141,4 +141,19 @@ sub check_service_is_relocatable {
     return 1;
 }
 
+sub remove_locks {
+    my ($self, $haenv, $id, $locks, $service_node) = @_;
+
+    my $sid = $self->type() . ":$id";
+    my $hardware = $haenv->hardware();
+
+    foreach my $lock (@$locks) {
+	if (my $removed_lock = $hardware->unlock_service($sid, $lock)) {
+	    return $removed_lock;
+	}
+    }
+
+    return undef;
+}
+
 1;

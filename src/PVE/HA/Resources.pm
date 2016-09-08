@@ -130,6 +130,12 @@ sub check_service_is_relocatable {
     die "implement in subclass";
 }
 
+sub remove_locks {
+    my ($self, $haenv, $id, $locks, $service_node) = @_;
+
+    die "implement in subclass";
+}
+
 
 
 # package PVE::HA::Resources::IPAddr;

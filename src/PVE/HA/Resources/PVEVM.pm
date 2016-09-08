@@ -136,4 +136,27 @@ sub check_service_is_relocatable {
     return 1;
 }
 
+sub remove_locks {
+    my ($self, $haenv, $id, $locks, $service_node) = @_;
+
+    $service_node = $service_node || $haenv->nodename();
+
+    my $conf = PVE::QemuConfig->load_config($id, $service_node);
+
+    return undef if !defined($conf->{lock});
+
+    foreach my $lock (@$locks) {
+	if ($conf->{lock} eq $lock) {
+	    delete $conf->{lock};
+
+	    my $cfspath = PVE::QemuConfig->cfs_config_path($id, $service_node);
+	    PVE::Cluster::cfs_write_file($cfspath, $conf);
+
+	    return $lock;
+	}
+    }
+
+    return undef;
+}
+
 1;
