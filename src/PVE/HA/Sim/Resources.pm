@@ -123,5 +123,22 @@ sub migrate {
     return defined($ss->{$sid}) ? 0 : 1;
 }
 
+sub check_service_is_relocatable {
+    my ($self, $haenv, $id, $service_node, $nonstrict, $noerr) = @_;
+
+    my $sid = $self->type() . ":$id";
+    my $hardware = $haenv->hardware();
+
+    my $conf = $hardware->read_service_config();
+
+    # check for blocking locks, when doing recovery allow safe-to-delete locks
+    my $lock = $conf->{$sid}->{lock};
+    if ($lock && !($nonstrict && ($lock eq 'backup' || $lock eq 'mounted'))) {
+	die "service is locked with lock '$lock'\n" if !$noerr;
+	return undef;
+    }
+
+    return 1;
+}
 
 1;

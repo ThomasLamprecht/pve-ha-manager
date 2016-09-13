@@ -124,6 +124,13 @@ sub check_running {
     die "implement in subclass";
 }
 
+sub check_service_is_relocatable {
+    my ($self, $haenv, $id, $service_node, $nonstrict, $noerr) = @_;
+
+    die "implement in subclass";
+}
+
+
 
 # package PVE::HA::Resources::IPAddr;
 

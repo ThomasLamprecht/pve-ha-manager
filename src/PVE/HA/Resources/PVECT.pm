@@ -114,4 +114,21 @@ sub check_running {
     return PVE::LXC::check_running($vmid);
 }
 
+sub check_service_is_relocatable {
+    my ($self, $haenv, $id, $service_node, $nonstrict, $noerr) = @_;
+
+    my $conf = PVE::LXC::Config->load_config($id, $service_node);
+
+    # check for blocking locks, when doing recovery allow safe-to-delete locks
+    my $lock = $conf->{lock};
+    if ($lock && !($nonstrict && ($lock eq 'backup' || $lock eq 'mounted'))) {
+	die "service is locked with lock '$lock'" if !$noerr;
+	return undef;
+    }
+
+    # TODO: check more (e.g. storage availability)
+
+    return 1;
+}
+
 1;

@@ -116,4 +116,24 @@ sub check_running {
     return PVE::QemuServer::check_running($vmid, 1, $nodename);
 }
 
+sub check_service_is_relocatable {
+    my ($self, $haenv, $id, $service_node, $nonstrict, $noerr) = @_;
+
+    my $conf = PVE::QemuConfig->load_config($id, $service_node);
+
+    # check for blocking locks, when doing recovery allow safe-to-delete locks
+    my $lock = $conf->{lock};
+    if ($lock && !($nonstrict && $lock eq 'backup')) {
+	die "service is locked with lock '$lock'\n" if !$noerr;
+	return undef;
+    }
+
+    # tell method to die if any local resources are in use
+    return undef if !PVE::QemuServer::check_local_resources($conf, $noerr);
+
+    # TODO: check more (e.g. storage availability)
+
+    return 1;
+}
+
 1;

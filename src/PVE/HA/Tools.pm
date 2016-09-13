@@ -193,6 +193,22 @@ sub upid_wait {
     PVE::ProcFSTools::upid_wait($upid, $waitfunc, 5);
 }
 
+# checks if a service can be relocated, i.e. if its not bound to a node
+# setting the 'nonstrict' parameter allows some of the checks to fail, e.g.
+# during recovery certain service types may have still a backup left over
+sub check_service_is_relocatable {
+    my ($sid, $haenv, $node, $nonstrict) = @_;
+
+    my (undef, $type, $id) = PVE::HA::Tools::parse_sid($sid);
+    my $plugin = PVE::HA::Resources->lookup($type);
+
+    if (!$plugin) {
+	die "service '$sid' has unknown resource type '$type'";
+    }
+
+    return $plugin->check_service_is_relocatable($haenv, $id, $node, $nonstrict);
+}
+
 # bash auto completion helper
 
 sub complete_sid {

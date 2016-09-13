@@ -261,6 +261,13 @@ my $recover_fenced_service = sub {
 					    $cd, $sd->{node});
 
     if ($recovery_node) {
+	eval { PVE::HA::Tools::check_service_is_relocatable($sid, $haenv, $fenced_node, 1); };
+	if (my $err = $@) {
+	    $haenv->log('err', "service '$sid' not recoverable: $err");
+	    &$change_service_state($self, $sid, 'error');
+	    return;
+	}
+
 	$haenv->log('info', "recover service '$sid' from fenced node " .
 		    "'$fenced_node' to node '$recovery_node'");
 
