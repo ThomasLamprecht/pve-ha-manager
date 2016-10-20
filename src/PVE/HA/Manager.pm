@@ -167,6 +167,7 @@ my $valid_service_states = {
     relocate => 1,
     freeze => 1,
     error => 1,
+    maintenance => 1,
 };
 
 sub recompute_online_node_usage {
@@ -348,6 +349,34 @@ sub update_crm_commands {
 	    } else {
 		$haenv->log('err', "crm command error - no such service: $cmd");
 	    }
+	} elsif ($cmd =~ m/^maintenance\s+(\S+)\s+(on|off)$/) {
+	    my ($sid, $cmd) = ($1, $2);
+
+	    if (my $sd = $ss->{$sid}) {
+		if ($cmd eq 'on') {
+
+		    if ($sd->{state} eq 'maintenance') {
+			$haenv->log('info', "ignore crm command - service already in maintenance mode: $cmd");
+		    } elsif ($sd->{state} eq 'error') {
+			$haenv->log('err', "ignore crm command - service is in error state: $cmd");
+		    } else {
+			$haenv->log('info', "got crm command: $cmd");
+			&$change_service_state($self, $sid, 'maintenance');
+		    }
+
+		} else {
+
+		    if ($sd->{state} ne 'maintenance') {
+			$haenv->log('info', "ignore crm command - service is not in maintenance mode: $cmd");
+		    } else {
+			$haenv->log('info', "got crm command: $cmd");
+			&$change_service_state($self, $sid, 'stopped');
+		    }
+
+		}
+	    } else {
+		$haenv->log('err', "crm command error - no such service: $cmd");
+	    }
 
 	} else {
 	    $haenv->log('err', "unable to parse crm command: $cmd");
@@ -427,6 +456,10 @@ sub manage {
 	    } elsif ($last_state eq 'request_stop') {
 
 		$self->next_state_request_stop($sid, $cd, $sd, $lrm_res);
+
+	    } elsif ($last_state eq 'maintenance') {
+
+		# do nothing until user says so
 
 	    } elsif ($last_state eq 'freeze') {
 

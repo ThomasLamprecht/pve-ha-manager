@@ -452,6 +452,7 @@ sub manage_resources {
 	my $req_state = $sd->{state};
 	next if !defined($req_state);
 	next if $req_state eq 'freeze';
+	next if $req_state eq 'maintenance';
 	$self->queue_resource_command($sid, $sd->{uid}, $req_state, $sd->{target});
     }
 
