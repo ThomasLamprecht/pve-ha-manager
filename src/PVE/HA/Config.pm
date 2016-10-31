@@ -196,7 +196,7 @@ sub read_crm_commands {
     return lock_ha_domain($code);
 }
 
-my $service_check_ha_state = sub {
+my $is_ha_service = sub {
     my ($conf, $sid, $has_state) = @_;
 
     if (my $d = $conf->{ids}->{$sid}) {
@@ -216,7 +216,7 @@ sub vm_is_ha_managed {
 
     my $types = PVE::HA::Resources->lookup_types();
     foreach my $type ('vm', 'ct') {
-	return 1 if &$service_check_ha_state($conf, "$type:$vmid", $has_state);
+	return 1 if &$is_ha_service($conf, "$type:$vmid", $has_state);
     }
 
     return undef;
@@ -227,7 +227,7 @@ sub service_is_ha_managed {
 
     my $conf = cfs_read_file($ha_resources_config);
 
-    return 1 if &$service_check_ha_state($conf, $sid, $has_state);
+    return 1 if &$is_ha_service($conf, $sid, $has_state);
 
     die "resource '$sid' is not HA managed\n" if !$noerr;
 
