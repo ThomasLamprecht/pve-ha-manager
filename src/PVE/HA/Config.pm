@@ -215,7 +215,7 @@ sub vm_is_ha_managed {
     my $conf = cfs_read_file($ha_resources_config);
 
     my $types = PVE::HA::Resources->lookup_types();
-    foreach my $type ('vm', 'ct') {
+    foreach my $type ('vm', 'ct', 'template') {
 	return 1 if &$service_check_ha_state($conf, "$type:$vmid", $has_state);
     }
 

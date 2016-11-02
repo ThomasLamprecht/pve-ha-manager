@@ -19,9 +19,11 @@ use PVE::HA::FenceConfig;
 use PVE::HA::Resources;
 use PVE::HA::Resources::PVEVM;
 use PVE::HA::Resources::PVECT;
+use PVE::HA::Resources::PVETemplate;
 
 PVE::HA::Resources::PVEVM->register();
 PVE::HA::Resources::PVECT->register();
+PVE::HA::Resources::PVETemplate->register();
 
 PVE::HA::Resources->init();
 
