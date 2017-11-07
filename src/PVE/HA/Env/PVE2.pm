@@ -177,17 +177,18 @@ sub get_node_info {
 
     my ($node_info, $quorate) = ({}, 0);
 
-    my $nodename = $self->{nodename};
+    if (PVE::Cluster::check_cfs_quorum(1)) {
+	$quorate = 1;
 
-    $quorate = PVE::Cluster::check_cfs_quorum(1) || 0;
+	my $members = PVE::Cluster::get_members();
 
-    my $members = PVE::Cluster::get_members();
-
-    foreach my $node (keys %$members) {
-	my $d = $members->{$node};
-	$node_info->{$node}->{online} = $d->{online};
+	foreach my $node (keys %$members) {
+	    my $d = $members->{$node};
+	    $node_info->{$node}->{online} = $d->{online};
+	}
     }
 
+    my $nodename = $self->{nodename};
     $node_info->{$nodename}->{online} = 1; # local node is always up
 
     return ($node_info, $quorate);
